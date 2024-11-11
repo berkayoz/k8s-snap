@@ -1,0 +1,13 @@
+{
+    "go.buildTags": "dqlite,libsqlite3",
+    "go.buildFlags": [
+        "-ldflags=-linkmode=external",
+        "-ldflags=-extldflags=-static"
+    ],
+    "go.toolsEnvVars": {
+        "PATH": "${env:PATH}:${workspaceFolder}/src/k8s/hack/.deps/static/musl/bin",
+        "CC": "musl-gcc",
+        "CGO_CFLAGS": "-I${workspaceFolder}/src/k8s/hack/.deps/static/include",
+        "CGO_LDFLAGS": "-L${workspaceFolder}/src/k8s/hack/.deps/static/lib -luv -ldqlite -llz4 -lsqlite3 -Wl,-z,stack-size=1048576"
+    },
+}

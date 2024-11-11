@@ -72,6 +72,8 @@ parts:
     after: [dqlite]
     source: src/k8s
     plugin: nil
+    build-environment:
+      - DEBUG_BUILD: "y"
     override-build: |
       INSTALL="${SNAPCRAFT_PART_INSTALL}"
 

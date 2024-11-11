@@ -1,0 +1,7 @@
+description: ""
+devices:
+  hostport80:
+    connect: tcp:127.0.0.1:2345
+    listen: tcp:0.0.0.0:2345
+    type: proxy
+name: delve-proxy-profile
