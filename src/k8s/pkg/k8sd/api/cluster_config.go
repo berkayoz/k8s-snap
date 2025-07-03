@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strings"
 
 	apiv1 "github.com/canonical/k8s-snap-api/api/v1"
 	"github.com/canonical/k8s/pkg/k8sd/database"
@@ -12,6 +13,9 @@ import (
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/utils"
 	"github.com/canonical/lxd/lxd/response"
+	microclusterapi "github.com/canonical/lxd/shared/api"
+	"github.com/canonical/microcluster/v2/client"
+	microclusterresponse "github.com/canonical/microcluster/v2/rest/response"
 	"github.com/canonical/microcluster/v2/state"
 )
 
@@ -50,6 +54,16 @@ func (e *Endpoints) putClusterConfig(s state.State, r *http.Request) response.Re
 		!requestedConfig.DNS.Empty() || !requestedConfig.Kubelet.Empty(),
 	)
 
+	// TODO(berkayoz): Maybe this should run in a goroutine?
+	if err := e.provider.OnClusterConfigChanged(r.Context(), s); err != nil {
+		return response.InternalError(fmt.Errorf("failed to handle cluster config change: %w", err))
+	}
+
+	// TODO(berkayoz): Errors below should be ignored?
+	if err := clusterConfigNotify(r.Context(), s); err != nil {
+		return response.InternalError(fmt.Errorf("failed to notify cluster config change: %w", err))
+	}
+
 	return response.SyncResponse(true, &apiv1.SetClusterConfigResponse{})
 }
 
@@ -65,4 +79,28 @@ func (e *Endpoints) getClusterConfig(s state.State, r *http.Request) response.Re
 		PodCIDR:     config.Network.PodCIDR,
 		ServiceCIDR: config.Network.ServiceCIDR,
 	})
+}
+
+func clusterConfigNotify(ctx context.Context, s state.State) error {
+	// Performs a request against all members except self
+	cluster, err := s.Cluster(true)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	// Error is ignored here, as this is a best-effort request to notify other members
+	cluster.Query(ctx, true, func(ctx context.Context, client *client.Client) error {
+		resp, err := client.QueryRaw(ctx, "POST", apiv1.K8sdAPIVersion, microclusterapi.NewURL().Path(strings.Split("k8sd/cluster/config/notify", "/")...), nil)
+		if err != nil {
+			return fmt.Errorf("failed to request cluster config notify: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if _, err := microclusterresponse.ParseResponse(resp); err != nil {
+			return fmt.Errorf("failed to handle cluster config notify: %w", err)
+		}
+		return nil
+	})
+
+	return nil
 }

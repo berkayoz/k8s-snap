@@ -8,6 +8,7 @@ import (
 	apiv1_annotations "github.com/canonical/k8s-snap-api/api/v1/annotations"
 	"github.com/canonical/k8s/pkg/client/kubernetes"
 	"github.com/canonical/k8s/pkg/k8sd/controllers/csrsigning"
+	"github.com/canonical/k8s/pkg/k8sd/controllers/feature"
 	"github.com/canonical/k8s/pkg/k8sd/controllers/upgrade"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/log"
@@ -125,6 +126,10 @@ func (c *Coordinator) setupControllers(
 		return fmt.Errorf("failed to setup CSR signing controller: %w", err)
 	}
 
+	if err := c.setupFeatureController(getClusterConfig, mgr); err != nil {
+		return fmt.Errorf("failed to setup feature controller: %w", err)
+	}
+
 	return nil
 }
 
@@ -184,6 +189,25 @@ func (c *Coordinator) setupCSRSigningController(
 
 	if err := csrsigningController.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("failed to setup csrsigning controller with manager: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Coordinator) setupFeatureController(
+	getClusterConfig func(context.Context) (types.ClusterConfig, error),
+	mgr manager.Manager,
+) error {
+	logger := mgr.GetLogger()
+
+	featureController := feature.NewController(
+		logger,
+		mgr.GetClient(),
+		getClusterConfig,
+	)
+
+	if err := featureController.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("failed to setup feature controller with manager: %w", err)
 	}
 
 	return nil

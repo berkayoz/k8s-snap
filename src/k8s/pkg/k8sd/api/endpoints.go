@@ -124,6 +124,11 @@ func (e *Endpoints) Endpoints() []rest.Endpoint {
 			Put:  rest.EndpointAction{Handler: e.putClusterConfig, AccessHandler: e.restrictWorkers},
 			Get:  rest.EndpointAction{Handler: e.getClusterConfig, AccessHandler: e.restrictWorkers},
 		},
+		{
+			Name: "ClusterConfig/Notify",
+			Path: "k8sd/cluster/config/notify",
+			Post: rest.EndpointAction{Handler: e.postClusterConfigNotify, AccessHandler: e.restrictWorkers},
+		},
 		// Kubernetes auth tokens and token review webhook for kube-apiserver
 		{
 			Name:   "KubernetesAuthTokens",

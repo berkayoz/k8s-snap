@@ -1,8 +1,11 @@
 package mock
 
 import (
+	"context"
+
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/microcluster/v2/microcluster"
+	"github.com/canonical/microcluster/v2/state"
 )
 
 type Provider struct {
@@ -10,6 +13,7 @@ type Provider struct {
 	SnapFn                             func() snap.Snap
 	NotifyUpdateNodeConfigControllerFn func()
 	NotifyFeatureControllerFn          func(network, gateway, ingress, loadBalancer, localStorage, metricsServer, dns bool)
+	OnClusterConfigChangedFn           func(ctx context.Context, s state.State) error
 }
 
 func (p *Provider) MicroCluster() *microcluster.MicroCluster {
@@ -36,4 +40,11 @@ func (p *Provider) NotifyFeatureController(network, gateway, ingress, loadBalanc
 	if p.NotifyFeatureControllerFn != nil {
 		p.NotifyFeatureControllerFn(network, gateway, ingress, loadBalancer, localStorage, metricsServer, dns)
 	}
+}
+
+func (p *Provider) OnClusterConfigChanged(ctx context.Context, s state.State) error {
+	if p.OnClusterConfigChangedFn != nil {
+		return p.OnClusterConfigChangedFn(ctx, s)
+	}
+	return nil
 }
