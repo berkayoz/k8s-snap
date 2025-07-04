@@ -44,6 +44,15 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 // Reconcile implements the reconcile.TypedReconciler interface.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger.Info("Reconciling ClusterConfig", "request", req)
+
+	config, err := r.getClusterConfig(ctx)
+	if err != nil {
+		r.logger.Error(err, "Failed to get cluster config")
+		return ctrl.Result{}, err
+	}
+
+	// features.Reconcile()
+
 	// TODO: Add your reconciliation logic here.
 	return ctrl.Result{}, nil
 }

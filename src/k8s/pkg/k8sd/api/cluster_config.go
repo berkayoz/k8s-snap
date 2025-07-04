@@ -55,6 +55,7 @@ func (e *Endpoints) putClusterConfig(s state.State, r *http.Request) response.Re
 	)
 
 	// TODO(berkayoz): Maybe this should run in a goroutine?
+	// Maybe https://github.com/canonical/dqlite/issues/326?
 	if err := e.provider.OnClusterConfigChanged(r.Context(), s); err != nil {
 		return response.InternalError(fmt.Errorf("failed to handle cluster config change: %w", err))
 	}
