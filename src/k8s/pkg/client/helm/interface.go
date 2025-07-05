@@ -3,10 +3,8 @@ package helm
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
 )
@@ -40,14 +38,10 @@ type Release struct {
 	*release.Release
 }
 
-func (r *Release) ShouldUpgrade(f InstallableChart, values map[string]any) (bool, error) {
+func (r *Release) ShouldUpgrade(chart *chart.Chart, values map[string]any) (bool, error) {
 	// If the release is nil, we cannot upgrade.
 	if r.Release == nil {
-		return false, fmt.Errorf("cannot upgrade release %s: release is nil", f.Name)
-	}
-	chart, err := loader.Load(filepath.Join(h.manifestsBaseDir, c.ManifestPath))
-	if err != nil {
-		return false, fmt.Errorf("failed to load manifest for: %w", err)
+		return false, fmt.Errorf("cannot upgrade release %s: release is nil", r.Name)
 	}
 	// NOTE(Angelos): oldConfig and values are the previous and current values. they are compared by checking their respective JSON, as that is good enough for our needs of comparing unstructured map[string]any data.
 	// NOTE(Hue) (KU-3592): We are ignoring the values that are overwritten by the user.
