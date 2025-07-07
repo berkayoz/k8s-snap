@@ -11,6 +11,7 @@ import (
 
 	"github.com/canonical/k8s/pkg/log"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	releasepkg "helm.sh/helm/v3/pkg/release"
@@ -169,6 +170,85 @@ func (h *client) Apply(ctx context.Context, c InstallableChart, desired State, v
 		// this never happens
 		return false, nil
 	}
+}
+
+func (h *client) Get(ctx context.Context, releaseName string, namespace string) (*Release, error) {
+	cfg, err := h.newActionConfiguration(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action configuration: %w", err)
+	}
+
+	get := action.NewGet(cfg)
+	release, err := get.Run(releaseName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status of release %s: %w", releaseName, err)
+	}
+
+	return &Release{Release: release}, nil
+}
+
+func (h *client) Install(ctx context.Context, releaseName string, namespace string, chart *chart.Chart, values map[string]any) (*Release, error) {
+	cfg, err := h.newActionConfiguration(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action configuration: %w", err)
+	}
+
+	install := action.NewInstall(cfg)
+	install.ReleaseName = releaseName
+	install.Namespace = namespace
+	install.CreateNamespace = true
+
+	release, err := install.RunWithContext(ctx, chart, values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to install release %s: %w", releaseName, err)
+	}
+
+	return &Release{Release: release}, nil
+}
+
+func (h *client) Upgrade(ctx context.Context, releaseName string, namespace string, chart *chart.Chart, values map[string]any) (*Release, error) {
+	cfg, err := h.newActionConfiguration(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action configuration: %w", err)
+	}
+
+	upgrade := action.NewUpgrade(cfg)
+	upgrade.Namespace = namespace
+	upgrade.ResetThenReuseValues = true
+	// NOTE(Hue): We need to set the upgrade.MaxHistory here since it overwrites the
+	// cfg.Releases.MaxHistory value.
+	upgrade.MaxHistory = h.maxHistory
+
+	release, err := upgrade.RunWithContext(ctx, releaseName, chart, values)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upgrade release %s: %w", releaseName, err)
+	}
+
+	return &Release{Release: release}, nil
+}
+
+func (h *client) Uninstall(ctx context.Context, releaseName string, namespace string) (*Release, error) {
+	cfg, err := h.newActionConfiguration(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create action configuration: %w", err)
+	}
+
+	uninstall := action.NewUninstall(cfg)
+	resp, err := uninstall.Run(releaseName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to uninstall release %s: %w", releaseName, err)
+	}
+
+	return &Release{Release: resp.Release}, nil
+}
+
+func (h *client) IsNotFound(err error) bool {
+	// Check if the error is a driver.ErrReleaseNotFound or a not found error.
+	if errors.Is(err, driver.ErrReleaseNotFound) {
+		return true
+	}
+
+	return false
 }
 
 func jsonEqual(v1 any, v2 any) bool {

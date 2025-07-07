@@ -55,7 +55,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, component Component
 				return ctrl.Result{}, fmt.Errorf("failed to get values for %s: %w", f.Name, err)
 			}
 
-			_, err = helm.Install(ctx, chart, values)
+			_, err = helm.Install(ctx, component.ReleaseName(), component.Namespace(), chart, values)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to install %s: %w", f.Name, err)
 			}
@@ -84,7 +84,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, component Component
 			return result, nil
 		}
 
-		_, err = helm.Uninstall(ctx, chart)
+		_, err = helm.Uninstall(ctx, component.ReleaseName(), component.Namespace())
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to uninstall %s: %w", f.Name, err)
 		}
@@ -122,7 +122,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, component Component
 		}
 
 		// Upgrade the feature with the provided values.
-		_, err = helm.Upgrade(ctx, chart, values)
+		_, err = helm.Upgrade(ctx, component.ReleaseName(), component.Namespace(), chart, values)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to upgrade %s: %w", f.Name, err)
 		}

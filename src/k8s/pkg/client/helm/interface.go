@@ -19,16 +19,16 @@ type Client interface {
 	Apply(ctx context.Context, f InstallableChart, desired State, values map[string]any) (bool, error)
 
 	// Get retrieves the latest Helm release with the specified name and namespace.
-	Get(ctx context.Context, release string, namespace string) (*Release, error)
+	Get(ctx context.Context, releaseName string, namespace string) (*Release, error)
 
 	// Install installs a new release with the given chart and values.
-	Install(ctx context.Context, chart *chart.Chart, values map[string]any) (*Release, error)
+	Install(ctx context.Context, releaseName string, namespace string, chart *chart.Chart, values map[string]any) (*Release, error)
 
 	// Upgrade upgrades an existing release with the given chart and values.
-	Upgrade(ctx context.Context, chart *chart.Chart, values map[string]any) (*Release, error)
+	Upgrade(ctx context.Context, releaseName string, namespace string, chart *chart.Chart, values map[string]any) (*Release, error)
 
 	// Uninstall removes a release from the cluster.
-	Uninstall(ctx context.Context, chart *chart.Chart) (*release.UninstallReleaseResponse, error)
+	Uninstall(ctx context.Context, releaseName string, namespace string) (*Release, error)
 
 	// IsNotFound checks if the error is a not found error.
 	IsNotFound(err error) bool
@@ -49,7 +49,7 @@ func (r *Release) ShouldUpgrade(chart *chart.Chart, values map[string]any) (bool
 	// NOTE(Hue): We clone the values map to avoid modifying the original user provided values.
 	clonedValues, err := cloneMap(values)
 	if err != nil {
-		return false, fmt.Errorf("failed to clone values %s: %w", err)
+		return false, fmt.Errorf("failed to clone values: %w", err)
 	}
 	mergedValues := chartutil.CoalesceTables(clonedValues, r.Config)
 	sameValues := jsonEqual(r.Config, mergedValues)
