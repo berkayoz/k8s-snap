@@ -1,5 +1,5 @@
 // Package features provides interfaces and base implementations for feature components.
-package features
+package component
 
 import (
 	"context"
@@ -14,16 +14,22 @@ import (
 
 // ComponentReconciler provides a base implementation for a reconciler.
 type ComponentReconciler struct {
-	Snap snap.Snap
+	snap snap.Snap
+}
+
+func NewComponentReconciler(snap snap.Snap) *ComponentReconciler {
+	return &ComponentReconciler{
+		snap: snap,
+	}
 }
 
 // Reconcile reconciles a component's release state.
 func (r *ComponentReconciler) Reconcile(ctx context.Context, component Component, config types.ClusterConfig) (ctrl.Result, error) {
-	helm := r.Snap.HelmClient()
+	helm := r.snap.HelmClient()
 
 	f := component.InstallableChart()
 
-	chart, err := loader.Load(filepath.Join("basedir", f.ManifestPath))
+	chart, err := loader.Load(filepath.Join(r.snap.K8sManifestsDir(), f.ManifestPath))
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to load manifest for: %w", err)
 	}
@@ -67,7 +73,12 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, component Component
 			if !result.IsZero() {
 				return result, nil
 			}
+		} else if helm.IsNotFound(err) && !component.IsEnabled(config) {
+			// Feature is not installed and it is disabled in the config.
+			// No action needed, just return.
+			return ctrl.Result{}, nil
 		}
+
 		return ctrl.Result{}, err
 	}
 

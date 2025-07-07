@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/k8s/pkg/utils"
@@ -13,12 +13,12 @@ import (
 )
 
 type Calico struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewCalico(s state.State, snap snap.Snap) *Calico {
 	return &Calico{
-		BaseComponent: features.NewBaseComponent(s, snap, "ck-network", "kube-system", ChartCalico),
+		BaseComponent: component.NewBaseComponent(s, snap, "ck-network", "kube-system", ChartCalico),
 	}
 }
 

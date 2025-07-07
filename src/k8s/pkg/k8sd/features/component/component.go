@@ -1,4 +1,4 @@
-package features
+package component
 
 import (
 	"context"

@@ -44,15 +44,6 @@ func (e *Endpoints) putClusterConfig(s state.State, r *http.Request) response.Re
 	}
 
 	e.provider.NotifyUpdateNodeConfigController()
-	e.provider.NotifyFeatureController(
-		!requestedConfig.Network.Empty(),
-		!requestedConfig.Gateway.Empty(),
-		!requestedConfig.Ingress.Empty(),
-		!requestedConfig.LoadBalancer.Empty(),
-		!requestedConfig.LocalStorage.Empty(),
-		!requestedConfig.MetricsServer.Empty(),
-		!requestedConfig.DNS.Empty() || !requestedConfig.Kubelet.Empty(),
-	)
 
 	// TODO(berkayoz): Maybe this should run in a goroutine?
 	// Maybe https://github.com/canonical/dqlite/issues/326?

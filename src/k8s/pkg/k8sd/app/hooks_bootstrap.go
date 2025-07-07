@@ -15,6 +15,7 @@ import (
 	"time"
 
 	apiv1 "github.com/canonical/k8s-snap-api/api/v1"
+	"github.com/canonical/k8s/pkg/k8sd/controllers/feature"
 	"github.com/canonical/k8s/pkg/k8sd/database"
 	"github.com/canonical/k8s/pkg/k8sd/pki"
 	"github.com/canonical/k8s/pkg/k8sd/setup"
@@ -523,15 +524,7 @@ func (a *App) onBootstrapControlPlane(ctx context.Context, s state.State, bootst
 	}
 	log.Info("API server is ready - notify controllers")
 
-	a.NotifyFeatureController(
-		cfg.Network.GetEnabled(),
-		cfg.Gateway.GetEnabled(),
-		cfg.Ingress.GetEnabled(),
-		cfg.LoadBalancer.GetEnabled(),
-		cfg.LocalStorage.GetEnabled(),
-		cfg.MetricsServer.GetEnabled(),
-		cfg.DNS.GetEnabled(),
-	)
+	feature.SendClusterConfigEvent()
 	a.NotifyUpdateNodeConfigController()
 	return nil
 }

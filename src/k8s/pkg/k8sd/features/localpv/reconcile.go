@@ -3,7 +3,7 @@ package localpv
 import (
 	"context"
 
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/microcluster/v2/state"
@@ -11,12 +11,12 @@ import (
 )
 
 type LocalPV struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewLocalPV(s state.State, snap snap.Snap) *LocalPV {
 	return &LocalPV{
-		BaseComponent: features.NewBaseComponent(s, snap, "ck-storage", "kube-system", Chart),
+		BaseComponent: component.NewBaseComponent(s, snap, "ck-storage", "kube-system", Chart),
 	}
 }
 

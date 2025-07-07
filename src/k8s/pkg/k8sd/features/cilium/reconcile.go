@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/k8s/pkg/utils"
@@ -15,13 +15,13 @@ import (
 )
 
 type Cilium struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewCilium(s state.State, snap snap.Snap) *Cilium {
 	// TODO(berkayoz): Add rollout pods config values to the Cilium values.
 	return &Cilium{
-		BaseComponent: features.NewBaseComponent(s, snap, "ck-network", "kube-system", ChartCilium),
+		BaseComponent: component.NewBaseComponent(s, snap, "ck-network", "kube-system", ChartCilium),
 	}
 }
 

@@ -3,7 +3,7 @@ package metallb
 import (
 	"context"
 
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/microcluster/v2/state"
@@ -11,12 +11,12 @@ import (
 )
 
 type MetalLB struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewMetalLB(s state.State, snap snap.Snap) *MetalLB {
 	return &MetalLB{
-		BaseComponent: features.NewBaseComponent(s, snap, "metallb", "metallb-system", ChartMetalLB),
+		BaseComponent: component.NewBaseComponent(s, snap, "metallb", "metallb-system", ChartMetalLB),
 	}
 }
 

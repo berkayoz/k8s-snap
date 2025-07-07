@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/microcluster/v2/state"
@@ -12,12 +12,12 @@ import (
 )
 
 type LBCRs struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewLBCRs(s state.State, snap snap.Snap) *LBCRs {
 	return &LBCRs{
-		BaseComponent: features.NewBaseComponent(s, snap, "metallb-config.LoadBalancer", "metallb-system", ChartMetalLBLoadBalancer),
+		BaseComponent: component.NewBaseComponent(s, snap, "metallb-loadbalancer", "metallb-system", ChartMetalLBLoadBalancer),
 	}
 }
 

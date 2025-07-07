@@ -126,7 +126,7 @@ func (c *Coordinator) setupControllers(
 		return fmt.Errorf("failed to setup CSR signing controller: %w", err)
 	}
 
-	if err := c.setupFeatureController(getClusterConfig, mgr); err != nil {
+	if err := c.setupFeatureController(getState(), c.snap, getClusterConfig, mgr); err != nil {
 		return fmt.Errorf("failed to setup feature controller: %w", err)
 	}
 
@@ -195,12 +195,16 @@ func (c *Coordinator) setupCSRSigningController(
 }
 
 func (c *Coordinator) setupFeatureController(
+	s state.State,
+	snap snap.Snap,
 	getClusterConfig func(context.Context) (types.ClusterConfig, error),
 	mgr manager.Manager,
 ) error {
 	logger := mgr.GetLogger()
 
 	featureController := feature.NewController(
+		s,
+		snap,
 		logger,
 		mgr.GetClient(),
 		getClusterConfig,

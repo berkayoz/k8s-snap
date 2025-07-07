@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/canonical/k8s/pkg/k8sd/database"
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/k8s/pkg/utils"
@@ -16,12 +16,12 @@ import (
 )
 
 type CoreDNS struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewCoreDNS(s state.State, snap snap.Snap) *CoreDNS {
 	return &CoreDNS{
-		BaseComponent: features.NewBaseComponent(s, snap, "ck-dns", "kube-system", Chart),
+		BaseComponent: component.NewBaseComponent(s, snap, "ck-dns", "kube-system", Chart),
 	}
 }
 

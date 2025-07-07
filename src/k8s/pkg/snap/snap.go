@@ -337,6 +337,10 @@ func (s *snap) K8sCRDDir() string {
 	return filepath.Join(s.snapDir, "k8s", "crds")
 }
 
+func (s *snap) K8sManifestsDir() string {
+	return filepath.Join(s.snapDir, "k8s", "manifests")
+}
+
 func (s *snap) K8sScriptsDir() string {
 	return filepath.Join(s.snapDir, "k8s", "scripts")
 }

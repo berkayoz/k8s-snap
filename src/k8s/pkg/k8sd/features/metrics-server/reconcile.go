@@ -3,7 +3,7 @@ package metrics_server
 import (
 	"context"
 
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/microcluster/v2/state"
@@ -11,12 +11,12 @@ import (
 )
 
 type MetricsServer struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewMetricsServer(s state.State, snap snap.Snap) *MetricsServer {
 	return &MetricsServer{
-		BaseComponent: features.NewBaseComponent(s, snap, "metrics-server", "kube-system", chart),
+		BaseComponent: component.NewBaseComponent(s, snap, "metrics-server", "kube-system", chart),
 	}
 }
 

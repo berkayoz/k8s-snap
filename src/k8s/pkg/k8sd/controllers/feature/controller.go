@@ -2,9 +2,16 @@ package feature
 
 import (
 	"context"
+	"fmt"
 
+	apiv1_annotations "github.com/canonical/k8s-snap-api/api/v1/annotations"
 	configv1alpha1 "github.com/canonical/k8s/pkg/k8sd/crds/config"
+	upgradesv1alpha "github.com/canonical/k8s/pkg/k8sd/crds/upgrades/v1alpha"
+	"github.com/canonical/k8s/pkg/k8sd/features"
 	"github.com/canonical/k8s/pkg/k8sd/types"
+	"github.com/canonical/k8s/pkg/log"
+	"github.com/canonical/k8s/pkg/snap"
+	"github.com/canonical/microcluster/v2/state"
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,20 +23,29 @@ import (
 var customEventChan = make(chan event.TypedGenericEvent[*configv1alpha1.ClusterConfig])
 
 type Controller struct {
+	s                state.State
+	snap             snap.Snap
 	logger           logr.Logger
 	client           client.Client
 	getClusterConfig func(context.Context) (types.ClusterConfig, error)
+
+	featureReconciler *features.FeatureReconciler
 }
 
 func NewController(
+	s state.State,
+	snap snap.Snap,
 	logger logr.Logger,
 	client client.Client,
 	getClusterConfig func(context.Context) (types.ClusterConfig, error),
 ) *Controller {
 	return &Controller{
-		logger:           logger,
-		client:           client,
-		getClusterConfig: getClusterConfig,
+		s:                 s,
+		snap:              snap,
+		logger:            logger,
+		client:            client,
+		getClusterConfig:  getClusterConfig,
+		featureReconciler: features.NewFeatureReconciler(s, snap),
 	}
 }
 
@@ -51,10 +67,52 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	// features.Reconcile()
+	blocked, err := r.isBlocked(ctx, config)
+	if err != nil {
+		r.logger.Error(err, "Failed to check if feature controller is blocked")
+		return ctrl.Result{}, err
+	}
+	if blocked {
+		r.logger.Info("Feature controller is blocked by an in-progress upgrade, skipping reconciliation")
+		// TODO(berkayoz): Consider using requeue after?
+		return ctrl.Result{}, nil
+	}
 
-	// TODO: Add your reconciliation logic here.
-	return ctrl.Result{}, nil
+	return r.featureReconciler.Reconcile(ctx, config)
+}
+
+// isBlocked checks if the feature controller is blocked by an in-progress upgrade.
+// If an upgrade is in progress, the feature controller will not apply any configuration changes.
+func (r *Controller) isBlocked(ctx context.Context, clusterConfig types.ClusterConfig) (bool, error) {
+	log := log.FromContext(ctx)
+
+	// Skip feature reconciliation while an upgrade is in progress to avoid conflicting cluster
+	// configuration changes.
+	if _, ok := clusterConfig.Annotations.Get(apiv1_annotations.AnnotationDisableSeparateFeatureUpgrades); !ok {
+		k8sClient, err := r.snap.KubernetesClient("")
+		if err != nil {
+			return false, fmt.Errorf("failed to get Kubernetes client: %w", err)
+		}
+
+		upgrade, err := k8sClient.GetInProgressUpgrade(ctx)
+		if err != nil {
+			return false, fmt.Errorf("failed to check for in-progress upgrade: %w", err)
+		}
+
+		if upgrade == nil {
+			return false, nil
+		}
+
+		if upgrade.Status.Phase == upgradesv1alpha.UpgradePhaseFeatureUpgrade {
+			log.Info("Upgrade in progress - but in feature upgrade phase - applying configuration", "upgrade", upgrade.Name, "phase", upgrade.Status.Phase)
+			return false, nil
+		}
+
+		log.Info("Upgrade in progress - feature controller blocked", "upgrade", upgrade.Name, "phase", upgrade.Status.Phase)
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func SendClusterConfigEvent() {

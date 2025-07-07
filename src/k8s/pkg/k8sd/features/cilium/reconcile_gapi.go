@@ -3,7 +3,7 @@ package cilium
 import (
 	"context"
 
-	"github.com/canonical/k8s/pkg/k8sd/features"
+	"github.com/canonical/k8s/pkg/k8sd/features/component"
 	"github.com/canonical/k8s/pkg/k8sd/types"
 	"github.com/canonical/k8s/pkg/snap"
 	"github.com/canonical/microcluster/v2/state"
@@ -11,12 +11,12 @@ import (
 )
 
 type GatewayAPI struct {
-	*features.BaseComponent
+	*component.BaseComponent
 }
 
 func NewGatewayAPI(s state.State, snap snap.Snap) *GatewayAPI {
 	return &GatewayAPI{
-		BaseComponent: features.NewBaseComponent(s, snap, "ck-gateway", "kube-system", chartGateway),
+		BaseComponent: component.NewBaseComponent(s, snap, "ck-gateway", "kube-system", chartGateway),
 	}
 }
 
