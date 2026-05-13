@@ -7,18 +7,16 @@ description: |-
   on any infrastructure
 license: GPL-3.0
 grade: stable
-confinement: classic
-# Note(ben): Snapcraft does not expose its base for part builds, so we need to set it manually.
-# Feature request tracked in https://github.com/canonical/snapcraft/issues/5614
-# For now, remember to also update OPENSSL_MODULES and etcd part BASE when bumping this version.
+confinement: strict
 base: core22
 environment:
   REAL_PATH: $PATH
   REAL_LD_LIBRARY_PATH: $LD_LIBRARY_PATH
   CRAFT_ARCH_TRIPLET_BUILD_FOR: $CRAFT_ARCH_TRIPLET_BUILD_FOR
-  # Note(ben): Needs to be changed to /snap/core24/current/usr/lib/x86_64-linux-gnu/ossl-modules/
-  # when base is updated to core24 (mind the removed "-3").
-  OPENSSL_MODULES: /snap/core22/current/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/ossl-modules-3/
+  # Note(ben): Resolves to the base snap (core22) since the base is mounted at /
+  # under strict confinement. When base is bumped to core24, drop the "-3" suffix:
+  # /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/ossl-modules/.
+  OPENSSL_MODULES: /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/ossl-modules-3/
 
 architectures:
   - build-on: [amd64]
@@ -26,12 +24,73 @@ architectures:
   - build-on: [ppc64el]
   - build-on: [s390x]
 
+layout:
+  # Kubernetes paths
+  /etc/kubernetes:
+    bind: $SNAP_COMMON/etc/kubernetes
+  /etc/cni/net.d:
+    bind: $SNAP_COMMON/etc/cni/net.d
+  /opt/cni/bin:
+    bind: $SNAP_COMMON/opt/cni/bin
+  /var/lib/kubelet:
+    bind: $SNAP_COMMON/var/lib/kubelet
+  # Logs and temporary files
+  /var/log/pods:
+    bind: $SNAP_COMMON/var/log/pods
+  /var/log/containers:
+    bind: $SNAP_COMMON/var/log/containers
+  # CNI
+  /var/lib/cni:
+    bind: $SNAP_COMMON/var/lib/cni
+  /var/lib/calico:
+    bind: $SNAP_COMMON/var/lib/calico
+  # Extras
+  /usr/local:
+    bind: $SNAP_COMMON/usr/local
+  /usr/libexec:
+    bind: $SNAP_COMMON/usr/libexec
+  /var/lib/kube-proxy:
+    bind: $SNAP_COMMON/var/lib/kube-proxy
+  /etc/service/enabled:
+    bind: $SNAP_COMMON/etc/service/enabled
+  /etc/nanorc:
+    bind-file: $SNAP_COMMON/etc/nanorc
+
+plugs:
+  home-read-all:
+    interface: home
+    read: all
+  docker-privileged:
+    interface: docker-support
+    privileged-containers: true
+  docker-unprivileged:
+    interface: docker-support
+    privileged-containers: false
+  # Cilium Ingress loads iptable_raw and xt_socket on boot; without these,
+  # datapath L7 redirection breaks and ingress returns 503.
+  # https://github.com/cilium/cilium/issues/25021
+  cilium-module-load:
+    interface: kernel-module-load
+    modules:
+      - name: iptable_raw
+        load: on-boot
+      - name: xt_socket
+        load: on-boot
+
+hooks:
+  remove:
+    plugs:
+      - network
+      - network-bind
+      - process-control
+      - network-control
+      - firewall-control
+
 parts:
   build-deps:
     plugin: nil
     build-snaps:
       - go/1.25-fips/stable
-    build-attributes: [enable-patchelf]
     build-packages:
       - sudo
       - autoconf
@@ -64,15 +123,13 @@ parts:
     after: [build-deps]
     source: build-scripts/components/etcd
     build-environment:
-    - BASE: core22  # Note: This field must match the base field above.
     - BIN: $CRAFT_STAGE/bin/etcd
     override-build: $CRAFT_PROJECT_DIR/build-scripts/build-component.sh etcd
-    build-attributes: [enable-patchelf]
     override-prime: |-
       case "$CRAFT_ARCH_TRIPLET_BUILD_FOR" in
         x86_64-linux-gnu|aarch64-linux-gnu)
           $CRAFT_PROJECT_DIR/build-scripts/hack/patch-elf-with-lief.sh \
-            $BASE $BIN $CRAFT_ARCH_TRIPLET_BUILD_FOR
+            $BIN $CRAFT_ARCH_TRIPLET_BUILD_FOR
           ;;
         *)
           # Only amd64/arm64 can use the LIEF-patcher python script above.
@@ -84,7 +141,6 @@ parts:
 
   k8sd:
     source: build-scripts/components/k8sd
-    build-attributes: [enable-patchelf]
     plugin: nil
     override-build: $CRAFT_PROJECT_DIR/build-scripts/build-component.sh k8sd
 
@@ -92,14 +148,12 @@ parts:
     after: [build-deps]
     plugin: nil
     source: build-scripts/components/cni
-    build-attributes: [enable-patchelf]
     override-build: $CRAFT_PROJECT_DIR/build-scripts/build-component.sh cni
 
   kubernetes:
     after: [build-deps]
     plugin: nil
     source: build-scripts
-    build-attributes: [enable-patchelf]
     override-build: $CRAFT_PROJECT_DIR/build-scripts/build-component.sh kubernetes
 
   kubernetes-version:
@@ -109,7 +163,6 @@ parts:
 
   helm:
     after: [build-deps]
-    build-attributes: [enable-patchelf]
     plugin: nil
     source: build-scripts/components/helm
     override-build: $CRAFT_PROJECT_DIR/build-scripts/build-component.sh helm
@@ -118,7 +171,6 @@ parts:
     after: [build-deps]
     plugin: autotools
     source: https://www.netfilter.org/pub/libmnl/libmnl-1.0.4.tar.bz2
-    build-attributes: [enable-patchelf]
     prime:
       - -usr/local/include
 
@@ -126,7 +178,6 @@ parts:
     after: [libmnl]
     plugin: autotools
     source: https://www.netfilter.org/projects/libnftnl/files/libnftnl-1.1.8.tar.bz2
-    build-attributes: [enable-patchelf]
     build-environment:
       - LIBMNL_LIBS: $CRAFT_STAGE/usr/lib
     prime:
@@ -136,7 +187,6 @@ parts:
     after: [libnftnl]
     source: https://www.netfilter.org/projects/iptables/files/iptables-1.8.6.tar.bz2
     plugin: autotools
-    build-attributes: [enable-patchelf]
     build-environment:
       - LIBMNL_LIBS: $CRAFT_STAGE/usr/lib
       - LIBNFTNL_LIBS: $CRAFT_STAGE/usr/lib
@@ -155,15 +205,12 @@ parts:
     plugin: nil
     source: build-scripts/components/containerd
     override-build: $CRAFT_PROJECT_DIR/build-scripts/build-component.sh containerd
-    build-environment:
-    - BASE: core22  # Note: This field must match the base field above.
-    build-attributes: [enable-patchelf]
     override-prime: |-
       case "$CRAFT_ARCH_TRIPLET_BUILD_FOR" in
         x86_64-linux-gnu|aarch64-linux-gnu)
           for BIN in containerd ctr containerd-shim-runc-v2; do
             $CRAFT_PROJECT_DIR/build-scripts/hack/patch-elf-with-lief.sh \
-                $BASE $CRAFT_STAGE/bin/$BIN $CRAFT_ARCH_TRIPLET_BUILD_FOR
+                $CRAFT_STAGE/bin/$BIN $CRAFT_ARCH_TRIPLET_BUILD_FOR
           done
           ;;
         *)
@@ -177,13 +224,11 @@ parts:
   runc:
     after: [iptables, build-deps]
     plugin: nil
-    build-attributes: [enable-patchelf]
     source: build-scripts/components/runc
     override-build: $CRAFT_PROJECT_DIR/build-scripts/build-component.sh runc
 
   bash-utils:
     plugin: nil
-    build-attributes: [enable-patchelf]
     stage-packages:
       - conntrack
       - coreutils
@@ -224,7 +269,6 @@ parts:
   k8s:
     plugin: nil
     source: k8s
-    build-attributes: [enable-patchelf]
     override-build: |
       rm $CRAFT_PART_INSTALL/k8s -rf
       cp --archive --link --no-dereference . $CRAFT_PART_INSTALL/k8s
@@ -257,6 +301,20 @@ parts:
 apps:
   k8s:
     command: k8s/wrappers/commands/k8s
+    plugs:
+      - firewall-control
+      - home
+      - home-read-all
+      - kernel-module-observe
+      - kubernetes-support
+      - log-observe
+      - login-session-observe
+      - mount-observe
+      - network
+      - network-control
+      - network-observe
+      - opengl
+      - system-observe
   containerd:
     command: k8s/wrappers/services/containerd
     daemon: notify
@@ -267,43 +325,134 @@ apps:
     restart-condition: always
     start-timeout: 5m
     before: [kubelet]
+    plugs:
+      - cifs-mount
+      - cilium-module-load
+      - docker-privileged
+      - firewall-control
+      - fuse-support
+      - kernel-crypto-api
+      - kubernetes-support
+      - mount-observe
+      - network-bind
+      - network-control
+      - opengl
   etcd:
     command: k8s/wrappers/services/etcd
     install-mode: disable
     daemon: simple
     before: [kube-apiserver]
+    plugs:
+      - hardware-observe
+      - mount-observe
+      - network
+      - network-bind
+      - process-control
+      - system-observe
   k8sd:
     command: k8s/wrappers/services/k8sd
     install-mode: enable
     daemon: simple
+    plugs:
+      - kubernetes-support
+      - mount-observe
+      - network
+      - network-bind
   kubelet:
     install-mode: disable
     command: k8s/wrappers/services/kubelet
     daemon: simple
     after: [containerd]
+    plugs:
+      - docker-privileged
+      - firewall-control
+      - hardware-observe
+      - kernel-module-observe
+      - kubernetes-support
+      - mount-observe
+      - network-bind
+      - network-control
+      - network-observe
+      - opengl
+      - process-control
+      - system-observe
   kube-apiserver:
     install-mode: disable
     command: k8s/wrappers/services/kube-apiserver
     daemon: simple
     before: [kubelet, kube-controller-manager, kube-proxy, kube-scheduler]
     stop-timeout: 5s
+    plugs:
+      - docker-privileged
+      - firewall-control
+      - hardware-observe
+      - kernel-module-observe
+      - kubernetes-support
+      - mount-observe
+      - network-bind
+      - network-control
+      - network-observe
+      - opengl
+      - process-control
+      - system-observe
   kube-controller-manager:
     install-mode: disable
     command: k8s/wrappers/services/kube-controller-manager
     daemon: simple
     after: [kube-apiserver]
+    plugs:
+      - docker-privileged
+      - firewall-control
+      - hardware-observe
+      - kernel-module-observe
+      - kubernetes-support
+      - mount-observe
+      - network-bind
+      - network-control
+      - network-observe
+      - opengl
+      - process-control
+      - system-observe
   kube-proxy:
     install-mode: disable
     command: k8s/wrappers/services/kube-proxy
     daemon: simple
     after: [kube-apiserver]
+    plugs:
+      - docker-privileged
+      - firewall-control
+      - hardware-observe
+      - kernel-module-observe
+      - kubernetes-support
+      - mount-observe
+      - network-bind
+      - network-control
+      - network-observe
+      - opengl
+      - process-control
+      - system-observe
   kube-scheduler:
     install-mode: disable
     command: k8s/wrappers/services/kube-scheduler
     daemon: simple
     after: [kube-apiserver]
+    plugs:
+      - docker-privileged
+      - firewall-control
+      - hardware-observe
+      - kernel-module-observe
+      - kubernetes-support
+      - mount-observe
+      - network-bind
+      - network-control
+      - network-observe
+      - opengl
+      - process-control
+      - system-observe
   k8s-apiserver-proxy:
     install-mode: disable
     command: k8s/wrappers/services/k8s-apiserver-proxy
     daemon: simple
     before: [kubelet, kube-proxy]
+    plugs:
+      - network-bind

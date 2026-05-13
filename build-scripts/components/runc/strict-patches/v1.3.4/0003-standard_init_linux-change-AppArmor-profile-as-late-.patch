@@ -1,0 +1,64 @@
+From 2d2d1615bfc1871f0d947074c84620d042568530 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 13 May 2026 10:24:43 +0000
+Subject: [PATCH 3/3] standard_init_linux: change AppArmor profile as late as
+ possible
+
+Moves apparmor.ApplyProfile and PR_SET_NO_NEW_PRIVS prctl to after
+syncParentReady, so when runc itself is sandboxed by snapd's AppArmor
+the profile change happens after the parent has dropped its socket
+mediation. NNP is set strictly after the profile change because the
+AppArmor kernel module refuses a profile switch once NNP is set.
+
+Adjusts the previous patch for runc version v1.3.4.
+
+Co-Authored-By: eaudetcobello <etienne.audet-cobello@canonical.com>
+Co-Authored-By: Alberto Mardegan <mardy@users.sourceforge.net>
+---
+ libcontainer/standard_init_linux.go | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/libcontainer/standard_init_linux.go b/libcontainer/standard_init_linux.go
+index 21516bd..919920a 100644
+--- a/libcontainer/standard_init_linux.go
++++ b/libcontainer/standard_init_linux.go
+@@ -128,9 +128,6 @@ func (l *linuxStandardInit) Init() error {
+ 			return &os.SyscallError{Syscall: "setdomainname", Err: err}
+ 		}
+ 	}
+-	if err := apparmor.ApplyProfile(l.config.AppArmorProfile); err != nil {
+-		return fmt.Errorf("unable to apply apparmor profile: %w", err)
+-	}
+ 
+ 	if err := sys.WriteSysctls(l.config.Config.Sysctl); err != nil {
+ 		return err
+@@ -148,11 +145,6 @@ func (l *linuxStandardInit) Init() error {
+ 	if err != nil {
+ 		return fmt.Errorf("can't get pdeath signal: %w", err)
+ 	}
+-	if l.config.NoNewPrivileges {
+-		if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+-			return &os.SyscallError{Syscall: "prctl(SET_NO_NEW_PRIVS)", Err: err}
+-		}
+-	}
+ 
+ 	if err := setupScheduler(l.config); err != nil {
+ 		return err
+@@ -168,6 +160,14 @@ func (l *linuxStandardInit) Init() error {
+ 	if err := syncParentReady(l.pipe); err != nil {
+ 		return fmt.Errorf("sync ready: %w", err)
+ 	}
++	if err := apparmor.ApplyProfile(l.config.AppArmorProfile); err != nil {
++		return fmt.Errorf("unable to apply apparmor profile: %w", err)
++	}
++	if l.config.NoNewPrivileges {
++		if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
++			return &os.SyscallError{Syscall: "prctl(SET_NO_NEW_PRIVS)", Err: err}
++		}
++	}
+ 	if err := selinux.SetExecLabel(l.config.ProcessLabel); err != nil {
+ 		return fmt.Errorf("can't set process label: %w", err)
+ 	}
+-- 
+2.43.0
+

@@ -8,24 +8,28 @@ then echo "Please run this script as root."
 fi
 
 declare -a INTERFACES=(
+  cifs-mount
+  cilium-module-load
   docker-privileged
+  docker-unprivileged
+  firewall-control
+  fuse-support
+  hardware-observe
+  home
+  home-read-all
+  kernel-crypto-api
+  kernel-module-observe
   kubernetes-support
+  log-observe
+  login-session-observe
+  mount-observe
   network
   network-bind
   network-control
   network-observe
-  firewall-control
-  process-control
-  kernel-module-observe
-  cilium-module-load
-  mount-observe
-  hardware-observe
-  system-observe
-  home
   opengl
-  home-read-all
-  login-session-observe
-  log-observe
+  process-control
+  system-observe
 )
 
 for if in "${INTERFACES[@]}"; do

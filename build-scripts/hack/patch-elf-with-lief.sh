@@ -5,13 +5,17 @@ set -ex
 DIR=`realpath $(dirname "${0}")`
 PRIME_DIRECTORY="${CRAFT_PRIME:-${DIR}/../../.prime}"
 
-BASE="${1}"
-BIN="${2}"
-ARCH_TRIPLET="${3}"
+BIN="${1}"
+ARCH_TRIPLET="${2}"
 
 # Note(ben): patchelf messes up the segments when patching the binary
 # due to https://github.com/NixOS/patchelf/issues/446.
 # Instead, we use a custom script based on LIEF to manually patch the rpath and interpreter.
+#
+# RPATH and interpreter use absolute in-snap paths (no /snap/<base>/current/...
+# prefix). Under strict confinement the base snap is mounted at /, so these
+# resolve to the base's libs/loader; the explicit /snap/core*/... form is
+# rejected by AppArmor and was the source of the pre-refresh-hook DENIED logs.
 echo "Patching ELF file: $BIN with LIEF"
 
 # Install Python deps for LIEF patcher
@@ -21,12 +25,12 @@ pip3 install -r $DIR/requirements.txt
 
 if [ "$ARCH_TRIPLET" = "x86_64-linux-gnu" ]; then
     python3 $DIR/patchelf.py "$BIN" \
-        --set-rpath /snap/$BASE/current/lib/x86_64-linux-gnu/ \
-        --set-interpreter /snap/$BASE/current/lib64/ld-linux-x86-64.so.2
+        --set-rpath /lib/x86_64-linux-gnu/ \
+        --set-interpreter /lib64/ld-linux-x86-64.so.2
 elif [ "$ARCH_TRIPLET" = "aarch64-linux-gnu" ]; then
     python3 $DIR/patchelf.py "$BIN" \
-        --set-rpath /snap/$BASE/current/lib/aarch64-linux-gnu/ \
-        --set-interpreter /snap/$BASE/current/lib/ld-linux-aarch64.so.1
+        --set-rpath /lib/aarch64-linux-gnu/ \
+        --set-interpreter /lib/ld-linux-aarch64.so.1
 else
     echo "Unsupported Architecture: $ARCH_TRIPLET"
     exit 1
